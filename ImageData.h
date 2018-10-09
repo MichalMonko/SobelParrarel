@@ -5,6 +5,8 @@
 #ifndef SOBEL_IMAGEDATA_H
 #define SOBEL_IMAGEDATA_H
 
+#include <cstdlib>
+#include <iostream>
 #include "TransformationMatrix.h"
 
 template<typename T>
@@ -19,12 +21,12 @@ public:
     const int numOfChannels;
 
 private:
-    T *const dataStart;
-    T *const dataEnd;
+    T *dataStart;
+    T *dataEnd;
 
     T *getPixelAt(int row, int column);
 
-    T *getTopLeftPixel(T *centerPixel, int offset);
+    T *getPixelRelativeTo(T *centerPixel, int offsetX, int offsetY);
 
 public:
     T *getData();
@@ -33,45 +35,56 @@ public:
 //    void applyKernel(const TransformationMatrix<dimSize, H> &kernel);
 
     template<const int dimSize, typename H>
-    void applyKernel( TransformationMatrix<dimSize, H> &kernel)
+    void applyConvolutionKernels(TransformationMatrix<dimSize, H> &kernelX, TransformationMatrix<dimSize, H> &kernelY,
+                                 const unsigned char THRESHOLD_LEVEL = 0)
     {
-        T *data = dataStart;
+        T *imageCopyBlock = (T *) malloc(numOfColumns * numOfRows * numOfChannels * sizeof(T));
+        T *convolutedImage = imageCopyBlock;
+        memcpy(imageCopyBlock, dataStart, numOfColumns * numOfRows * numOfChannels * sizeof(T));
 
-        const int distanceToEdges = dimSize % 3;
+        const int distanceToEdges = dimSize / 2;
 
         const int rowStartIndex = distanceToEdges;
-        const int rowEndIndex = numOfColumns - distanceToEdges - 1;
+        const int lastRowIndex = numOfRows - distanceToEdges;
 
         const int columnStartIndex = distanceToEdges;
-        const int columnEndIndex = numOfRows - distanceToEdges - 1;
+        const int lastColumnIndex = numOfColumns - distanceToEdges;
 
-        H coefficientsSum = kernel.getCoefficientsSum();
-
-        T *centerPixel;
         T *topLeftPixel;
-        T localCoefficient;
+        H localCoefficientX;
+        H localCoefficientY;
 
-        for (int i = rowStartIndex; i < rowEndIndex; i++)
+        for (int i = rowStartIndex; i < lastRowIndex; i++)
         {
-            for (int j = columnStartIndex; j < columnEndIndex; j++)
+            for (int j = columnStartIndex; j < lastColumnIndex; j++)
             {
-
-                centerPixel = getPixelAt(i, j);
-                topLeftPixel = getTopLeftPixel(centerPixel, dimSize);
-                localCoefficient = 0;
+                topLeftPixel = getPixelAt(i - distanceToEdges, j - distanceToEdges);
+                localCoefficientX = 0;
+                localCoefficientY = 0;
 
                 for (int rowOffset = 0; rowOffset < dimSize; rowOffset++)
                 {
                     for (int columnOffset = 0; columnOffset < dimSize; columnOffset++)
                     {
-                        localCoefficient += *(topLeftPixel + columnOffset + rowOffset * numOfColumns)
-                                            * kernel.valueAt(rowOffset, columnOffset);
+                        H kernelValueForPixelX = kernelX.valueAt(rowOffset, columnOffset);
+                        H kernelValueForPixelY = kernelY.valueAt(rowOffset, columnOffset);
+
+                        T *currentPixel = getPixelRelativeTo(topLeftPixel, columnOffset, rowOffset);
+
+                        localCoefficientX += (*currentPixel) * kernelValueForPixelX;
+                        localCoefficientY += (*currentPixel) * kernelValueForPixelY;
                     }
                 }
 
-                *centerPixel = (T) (localCoefficient / coefficientsSum);
+                T pixelValue = (T) abs(localCoefficientX) + abs(localCoefficientY);
+                T *convolutedImagePixel = convolutedImage + j + i * numOfColumns * numOfChannels;
+
+                *convolutedImagePixel = MAX(pixelValue, THRESHOLD_LEVEL);
             }
         }
+
+        free(dataStart);
+        dataStart = convolutedImage;
     }
 };
 

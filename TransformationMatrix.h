@@ -26,6 +26,6 @@ public:
 };
 
 template
-class TransformationMatrix<3,char>;
+class TransformationMatrix<3, int>;
 
 #endif //SOBEL_TRANSFORMATIONMATRIX_H

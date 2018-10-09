@@ -13,7 +13,7 @@ static const double factorB = 0.11;
 
 int main(int argc, char **argv)
 {
-    Mat originalImage = imread("/home/warchlak/CLionProjects/Sobel/notre-dame.jpg", IMREAD_COLOR);
+    Mat originalImage = imread("/home/warchlak/CLionProjects/Sobel/valve.PNG");
 
     if (originalImage.empty() || originalImage.depth() != CV_8U)
     {
@@ -27,25 +27,38 @@ int main(int argc, char **argv)
 
     unsigned char *greyscaleCopy = makeGreyscaleCopy(originalImage.datastart, imageHeight, imageWidth,
                                                      originalImage.channels());
+
+
+//    cv::Mat greyscaleImage = Mat(imageHeight, imageWidth, CV_8UC1, greyscaleCopy);
+//
     ImageData<unsigned char> image(greyscaleCopy, imageHeight, imageWidth, 1,
                                    CV_8UC1);
 
-    cv::Mat greyscaleImage = Mat(image.numOfRows, image.numOfColumns, image.cvType, image.getData());
+    int coefficients[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+    TransformationMatrix<3, int> sobelX(coefficients);
 
-     char coefficients[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-    TransformationMatrix<3,char> sobelX(coefficients);
+    int coefficients_y[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
+    TransformationMatrix<3, int> sobelY(coefficients_y);
 
-    image.applyKernel<3, char>(sobelX);
+    image.applyConvolutionKernels<3, int>(sobelX, sobelY);
+
+    cv::Mat matImage = Mat(image.numOfRows, image.numOfColumns, image.cvType, image.getData());
 
     String windowName = "original";
     namedWindow(windowName);
     imshow(windowName, originalImage);
     waitKey(0);
 
-    windowName = "greyscale";
+//    windowName = "grey";
+//    namedWindow(windowName, WINDOW_NORMAL);
+//    imshow(windowName, greyscaleImage);
+//    waitKey(0);
+
+    windowName = "SOBEL";
     namedWindow(windowName);
-    imshow(windowName, greyscaleImage);
+    imshow(windowName, matImage);
     waitKey(0);
+
     destroyAllWindows();
 
     return 0;
@@ -61,6 +74,7 @@ makeGreyscaleCopy(const unsigned char *imageDataBegin, int imageHeight, int imag
     if (channels == 1)
     {
         memcpy(greyscaleCopy, imageDataBegin, imageDataSize * sizeof(unsigned char));
+        return greyscaleCopy;
     }
 
     const unsigned char *imageData = imageDataBegin;

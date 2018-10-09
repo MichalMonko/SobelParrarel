@@ -7,6 +7,10 @@
 #IncludeRegexTransform: 
 
 /home/warchlak/CLionProjects/Sobel/ImageData.h
+cstdlib
+-
+iostream
+-
 TransformationMatrix.h
 /home/warchlak/CLionProjects/Sobel/TransformationMatrix.h
 
