@@ -13,7 +13,7 @@ static const double factorB = 0.11;
 
 int main(int argc, char **argv)
 {
-    Mat originalImage = imread("/home/warchlak/CLionProjects/Sobel/valve.PNG");
+    Mat originalImage = imread("/home/warchlak/CLionProjects/Sobel/notre-dame.jpg");
 
     if (originalImage.empty() || originalImage.depth() != CV_8U)
     {
