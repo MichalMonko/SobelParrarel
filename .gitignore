@@ -1,0 +1,11 @@
+cmake-build-debug
+.*
+.idea/*
+*.jpg
+*.png
+*.JPG
+*.PNG
+*.JPEG
+*.jpeg
+*.gif
+*.GIF
