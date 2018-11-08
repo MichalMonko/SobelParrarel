@@ -24,9 +24,19 @@ T *ImageData<T>::getPixelAt(int row, int column)
 }
 
 template<typename T>
-T *ImageData<T>::getPixelRelativeTo(T *centerPixel, int offsetX, int offsetY)
+T ImageData<T>::getPixelValueRelativeTo(int row, int col, int rowOffset, int colOffset)
 {
-    return (centerPixel + offsetX + offsetY * numOfColumns * numOfChannels);
+    int rowIndex = row + rowOffset;
+    int colIndex = col + colOffset;
+
+    if (rowIndex >= numOfRows || colIndex >= numOfColumns)
+    {
+        return 0;
+    }
+
+    T *pixel = getPixelAt(rowIndex, colIndex);
+    return (*pixel);
+
 }
 
 

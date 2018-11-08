@@ -1,6 +1,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include "ImageData.h"
+#include <time.h>
 
 using namespace cv;
 using namespace std;
@@ -11,15 +12,27 @@ static const double factorR = 0.3;
 static const double factorG = 0.59;
 static const double factorB = 0.11;
 
+
 int main(int argc, char **argv)
 {
-    Mat originalImage = imread("/home/warchlak/CLionProjects/Sobel/notre-dame.jpg");
+    clock_t start, end;
+
+    if (argc < 2)
+    {
+        cerr << "Invalid arguments number" << endl;
+        return -1;
+    }
+    
+    start = clock();
+
+    Mat originalImage = imread(argv[1]);
 
     if (originalImage.empty() || originalImage.depth() != CV_8U)
     {
-        cout << "Image is empty or type invalid";
+        cerr << "Image " << argv[0] << " is empty or type invalid" << endl;
         return -1;
     }
+
 
     int imageWidth = originalImage.cols;
     int imageHeight = originalImage.rows;
@@ -40,27 +53,39 @@ int main(int argc, char **argv)
     int coefficients_y[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
     TransformationMatrix<3, int> sobelY(coefficients_y);
 
+
     image.applyConvolutionKernels<3, int>(sobelX, sobelY);
 
-    cv::Mat matImage = Mat(image.numOfRows, image.numOfColumns, image.cvType, image.getData());
 
-    String windowName = "original";
-    namedWindow(windowName);
-    imshow(windowName, originalImage);
-    waitKey(0);
+    cv::Mat sobelImage = Mat(image.numOfRows, image.numOfColumns, image.cvType, image.getData());
+
+    end = clock();
+
+    double time_passed = double((end - start)) / CLOCKS_PER_SEC;
+
+//    String windowName = "original";
+//    namedWindow(windowName);
+//    imshow(windowName, originalImage);
+//    waitKey(0);
 
 //    windowName = "grey";
 //    namedWindow(windowName, WINDOW_NORMAL);
 //    imshow(windowName, greyscaleImage);
 //    waitKey(0);
 
-    windowName = "SOBEL";
-    namedWindow(windowName);
-    imshow(windowName, matImage);
-    waitKey(0);
+//    windowName = "SOBEL";
+//    namedWindow(windowName);
+//    imshow(windowName, matImage);
+//    waitKey(0);
+//
+//    destroyAllWindows();
 
-    destroyAllWindows();
+    if (!imwrite(argv[2], sobelImage))
+    {
+        cerr << "Cannot save converted image, please check filename and extension.\n";
+    }
 
+    cout << "Completed in " << time_passed << " seconds" << endl;
     return 0;
 
 }

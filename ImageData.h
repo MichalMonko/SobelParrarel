@@ -26,7 +26,7 @@ private:
 
     T *getPixelAt(int row, int column);
 
-    T *getPixelRelativeTo(T *centerPixel, int offsetX, int offsetY);
+    T getPixelValueRelativeTo(int row, int col, int rowOffset, int colOffset);
 
 public:
     T *getData();
@@ -38,27 +38,22 @@ public:
     void applyConvolutionKernels(TransformationMatrix<dimSize, H> &kernelX, TransformationMatrix<dimSize, H> &kernelY,
                                  const unsigned char THRESHOLD_LEVEL = 0)
     {
-        T *imageCopyBlock = (T *) malloc(numOfColumns * numOfRows * numOfChannels * sizeof(T));
-        T *convolutedImage = imageCopyBlock;
-        memcpy(imageCopyBlock, dataStart, numOfColumns * numOfRows * numOfChannels * sizeof(T));
 
-        const int distanceToEdges = dimSize / 2;
+        T *convolutedImage = (T *) malloc(numOfColumns * numOfRows * numOfChannels * sizeof(T));
+        memcpy(convolutedImage, dataStart, numOfColumns * numOfRows * numOfChannels * sizeof(T));
 
-        const int rowStartIndex = distanceToEdges;
-        const int lastRowIndex = numOfRows - distanceToEdges;
+        const int lastRowIndex = numOfRows - 1;
 
-        const int columnStartIndex = distanceToEdges;
-        const int lastColumnIndex = numOfColumns - distanceToEdges;
+        const int lastColumnIndex = numOfColumns - 1;
 
         T *topLeftPixel;
         H localCoefficientX;
         H localCoefficientY;
 
-        for (int i = rowStartIndex; i < lastRowIndex; i++)
+        for (int row = 0; row < lastRowIndex; row++)
         {
-            for (int j = columnStartIndex; j < lastColumnIndex; j++)
+            for (int col = 0; col < lastColumnIndex; col++)
             {
-                topLeftPixel = getPixelAt(i - distanceToEdges, j - distanceToEdges);
                 localCoefficientX = 0;
                 localCoefficientY = 0;
 
@@ -69,15 +64,15 @@ public:
                         H kernelValueForPixelX = kernelX.valueAt(rowOffset, columnOffset);
                         H kernelValueForPixelY = kernelY.valueAt(rowOffset, columnOffset);
 
-                        T *currentPixel = getPixelRelativeTo(topLeftPixel, columnOffset, rowOffset);
+                        T currentPixelValue = getPixelValueRelativeTo(row, col, rowOffset, columnOffset);
 
-                        localCoefficientX += (*currentPixel) * kernelValueForPixelX;
-                        localCoefficientY += (*currentPixel) * kernelValueForPixelY;
+                        localCoefficientX += currentPixelValue * kernelValueForPixelX;
+                        localCoefficientY += currentPixelValue * kernelValueForPixelY;
                     }
                 }
 
                 T pixelValue = (T) abs(localCoefficientX) + abs(localCoefficientY);
-                T *convolutedImagePixel = convolutedImage + j + i * numOfColumns * numOfChannels;
+                T *convolutedImagePixel = convolutedImage + col + row * numOfColumns * numOfChannels;
 
                 *convolutedImagePixel = MAX(pixelValue, THRESHOLD_LEVEL);
             }
