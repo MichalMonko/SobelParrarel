@@ -21,8 +21,6 @@ public:
 
     const T valueAt(int rowIndex, int colIndex);
 
-    const T getCoefficientsSum();
-
 };
 
 template
