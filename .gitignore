@@ -9,3 +9,8 @@ cmake-build-debug
 *.jpeg
 *.gif
 *.GIF
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles/**
+cmake-build-debug/**
+

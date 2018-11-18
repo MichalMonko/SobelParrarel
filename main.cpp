@@ -1,6 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include "ImageData.h"
+#include "include/ImageTransformation.h"
 #include <time.h>
 #include <mpi.h>
 
@@ -121,21 +121,44 @@ int main(int argc, char **argv)
 
     if (worldRank == 0)
     {
-        ImageData<unsigned char> image(greyscaleCopy, imageHeight, imageWidth, 1,
-                                       CV_8UC1);
-        cv::Mat greyscaleImage = Mat(image.numOfRows, image.numOfColumns, image.cvType, image.getData());
+        ImageDataClass image(greyscaleCopy, imageHeight, imageWidth, 1);
+        cv::Mat greyscaleImage = Mat(image.numOfRows, image.numOfColumns, CV_8UC1, greyscaleCopy);
 
-        int coefficients[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-        TransformationMatrix<3, int> sobelX(coefficients);
+        auto *greyscaleCopy1 = (u_char *) malloc(image.numOfRows * image.numOfColumns * sizeof(u_char));
+        auto *greyscaleCopy2 = (u_char *) malloc(image.numOfRows * image.numOfColumns * sizeof(u_char));
 
-        int coefficients_y[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
-        TransformationMatrix<3, int> sobelY(coefficients_y);
+        memcpy(greyscaleCopy1, greyscaleCopy, (size_t) image.numOfRows * image.numOfColumns);
+        memcpy(greyscaleCopy2, greyscaleCopy, (size_t) image.numOfRows * image.numOfColumns);
+
+        auto *gradientImageX = new Mat(image.numOfRows, image.numOfColumns, CV_8UC1, greyscaleCopy1);
+        auto *gradientImageY = new Mat(image.numOfRows, image.numOfColumns, CV_8UC1, greyscaleCopy2);
+
+        auto *gradientX = new ImageDataClass(gradientImageX->data, image.numOfRows, image.numOfColumns, 1);
+        auto *gradientY = new ImageDataClass(gradientImageY->data, image.numOfRows, image.numOfColumns, 1);
+
+        auto *sobelMatrixX = new TransformationMatrix<double>(3, multiply_each, sobelXkernel);
+        auto *sobelMatrixY = new TransformationMatrix<double>(3, multiply_each, sobelYkernel);
 
 
-        image.applyConvolutionKernels<3, int>(sobelX, sobelY);
+        gradientX->dataStart = convolve(gradientX, 3, sum_pixel_values_absolute, sobelMatrixX, ZERO_FILL);
+        gradientY->dataStart = convolve(gradientY, 3, sum_pixel_values_absolute, sobelMatrixY, ZERO_FILL);
 
+        cv::Mat sobelImage = Mat(image.numOfRows, image.numOfColumns, CV_8UC1);
 
-        cv::Mat sobelImage = Mat(image.numOfRows, image.numOfColumns, image.cvType, image.getData());
+        set_threshold(120);
+        sobelImage.data = multiply_and_sqrt_each_pixel(gradientX, gradientY);
+
+        delete gradientImageX;
+        delete gradientImageY;
+        delete sobelMatrixX;
+        delete sobelMatrixY;
+        free(greyscaleCopy1);
+        free(greyscaleCopy2);
+
+//        namedWindow("sobel");
+//        imshow("sobel", sobelImage);
+//        waitKey(0);
+//        destroyAllWindows();
 
         if (!imwrite(argv[2], sobelImage))
         {
@@ -198,4 +221,73 @@ makeGreyscaleCopy(const unsigned char *imageDataBegin, int imageDataSize, int ch
 
     return greyscaleCopy;
 }
+
+//int main(int argc, char **argv)
+//{
+//    if (argc < 2)
+//    {
+//        cerr << "Invalid arguments number" << endl;
+//        return -1;
+//    }
+//
+//    Mat originalImage = imread(argv[1]);
+//
+//    int imageHeight = originalImage.rows;
+//    int imageWidth = originalImage.cols;
+//
+//    Mat medianedImage(imageHeight, imageWidth, CV_8UC3);
+//    Mat averagedImage(imageHeight, imageWidth, CV_8UC3);
+//
+//    if (originalImage.empty() || originalImage.depth() != CV_8U)
+//    {
+//        cerr << "Image " << argv[0] << " is empty or type invalid" << endl;
+//        return -1;
+//    }
+//
+//    Mat bgr[3];
+//    split(originalImage, bgr);
+//
+////OpenCV uses BGR color order!!!
+//    ImageDataClass B(bgr[0].data, imageHeight, imageWidth, 1);
+//    ImageDataClass G(bgr[1].data, imageHeight, imageWidth, 1);
+//    ImageDataClass R(bgr[2].data, imageHeight, imageWidth, 1);
+//
+//    bgr[0].data = convolve(B, 5, median_filter, nullptr, NN_CLONE);
+//    bgr[1].data = convolve(G, 5, median_filter, nullptr, NN_CLONE);
+//    bgr[2].data = convolve(R, 5, median_filter, nullptr, NN_CLONE);
+//
+//    merge(bgr, 3, medianedImage);
+//
+//    Mat average_bgr[3];
+//    split(originalImage, average_bgr);
+//
+////OpenCV uses BGR color order!!!
+//    ImageDataClass aB(average_bgr[0].data, imageHeight, imageWidth, 1);
+//    ImageDataClass aG(average_bgr[1].data, imageHeight, imageWidth, 1);
+//    ImageDataClass aR(average_bgr[2].data, imageHeight, imageWidth, 1);
+//
+//    int kernelSize = 5;
+//    auto *hat_kernel_matrix = new TransformationMatrix(kernelSize, multiply_each, hat_kernel);
+//
+//    average_bgr[0].data = convolve(aB, kernelSize, sum_pixel_values, hat_kernel_matrix, NN_CLONE);
+//    average_bgr[1].data = convolve(aG, kernelSize, sum_pixel_values, hat_kernel_matrix, NN_CLONE);
+//    average_bgr[2].data = convolve(aR, kernelSize, sum_pixel_values, hat_kernel_matrix, NN_CLONE);
+//
+//    delete hat_kernel_matrix;
+//
+//    merge(average_bgr, 3, averagedImage);
+//
+//    imwrite("leoMedian.jpg", medianedImage);
+//    imwrite("leoAvg.jpg", averagedImage);
+//
+//    namedWindow("original");
+//    namedWindow("medianFilter");
+//    namedWindow("averageHat");
+//    imshow("original", originalImage);
+//    imshow("medianFilter", medianedImage);
+//    imshow("averageHat", averagedImage);
+//    waitKey(0);
+//    destroyAllWindows();
+//}
+
 
