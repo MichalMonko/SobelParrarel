@@ -4,6 +4,8 @@
 #include <time.h>
 #include <mpi.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
 using namespace cv;
 using namespace std;
 
@@ -96,6 +98,8 @@ int main(int argc, char **argv)
         greyscaleCopy = (uchar *) malloc(sizeof(uchar) * imageSize);
     }
 
+    MPI_Bcast(&imageWidth, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&imageHeight, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(dataSize, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(dataOffset, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(rcv_dataSize, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
@@ -104,10 +108,6 @@ int main(int argc, char **argv)
 
 
     imageFragment = (uchar *) malloc(sizeof(uchar *) * dataSize[worldRank]);
-
-    cout << worldRank << " DataSize " << dataSize[worldRank] << " Data offset " << dataOffset[worldRank] << endl;
-    cout << worldRank << " DataSizeReceive " << rcv_dataSize[worldRank] << " Data receive offset "
-         << rcv_dataOffset[worldRank] << endl;
 
     MPI_Scatterv(originalImage.datastart, dataSize, dataOffset, MPI_UNSIGNED_CHAR, imageFragment, dataSize[worldRank],
                  MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
@@ -119,41 +119,117 @@ int main(int argc, char **argv)
                 rcv_dataOffset,
                 MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
 
+    uchar *sobelData = greyscaleCopy;
+
+    auto *data_to_send_index = (int *) malloc(sizeof(int) * worldSize);
+    auto *pixels_to_receive = (int *) malloc(sizeof(int) * worldSize);
+    auto *pixels_to_send_back = (int *) malloc(sizeof(int) * worldSize);
+    auto *num_of_rows = (int *) malloc(sizeof(int) * worldSize);
+    auto *data_receive_index = (int *) malloc(sizeof(int) * worldSize);
+    auto *send_back_starting_index = (int *) malloc(sizeof(int) * worldSize);
+
     if (worldRank == 0)
     {
-        ImageDataClass image(greyscaleCopy, imageHeight, imageWidth, 1);
-        cv::Mat greyscaleImage = Mat(image.numOfRows, image.numOfColumns, CV_8UC1, greyscaleCopy);
+        int rows_per_core = imageHeight / worldSize;
+        int remaining_rows = imageHeight % worldSize;
 
-        auto *greyscaleCopy1 = (u_char *) malloc(image.numOfRows * image.numOfColumns * sizeof(u_char));
-        auto *greyscaleCopy2 = (u_char *) malloc(image.numOfRows * image.numOfColumns * sizeof(u_char));
+        for (int i = 0; i < worldSize; ++i)
+        {
+            if (i == 0)
+            {
+                data_to_send_index[i] = 0;
+                num_of_rows[i] = rows_per_core + remaining_rows + 1;
+                pixels_to_receive[i] = num_of_rows[i] * imageWidth;
+                pixels_to_send_back[i] = (num_of_rows[i] - 1) * imageWidth;
+                data_receive_index[i] = 0;
+                send_back_starting_index[i] = 0;
+                continue;
+            }
+            if (i == (worldSize - 1))
+            {
+                data_to_send_index[i] = (i * rows_per_core - 1) * imageWidth;
+                num_of_rows[i] = rows_per_core + 1;
+                pixels_to_receive[i] = num_of_rows[i] * imageWidth;
+                pixels_to_send_back[i] = (num_of_rows[i]) * imageWidth;
+                data_receive_index[i] = (i * rows_per_core) * imageWidth;
+                send_back_starting_index[i] = imageWidth;
+                continue;
+            }
+            data_to_send_index[i] = (i * rows_per_core - 1) * imageWidth;
+            num_of_rows[i] = rows_per_core + 2;
+            pixels_to_receive[i] = num_of_rows[i] * imageWidth;
+            pixels_to_send_back[i] = (num_of_rows[i] - 1) * imageWidth;
+            data_receive_index[i] = (i * rows_per_core) * imageWidth;
+            send_back_starting_index[i] = imageWidth;
+        }
+    }
 
-        memcpy(greyscaleCopy1, greyscaleCopy, (size_t) image.numOfRows * image.numOfColumns);
-        memcpy(greyscaleCopy2, greyscaleCopy, (size_t) image.numOfRows * image.numOfColumns);
+    MPI_Bcast(data_to_send_index, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(pixels_to_receive, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(pixels_to_send_back, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(num_of_rows, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(data_receive_index, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(send_back_starting_index, worldSize, MPI_INT, 0, MPI_COMM_WORLD);
 
-        auto *gradientImageX = new Mat(image.numOfRows, image.numOfColumns, CV_8UC1, greyscaleCopy1);
-        auto *gradientImageY = new Mat(image.numOfRows, image.numOfColumns, CV_8UC1, greyscaleCopy2);
+    free(greyscaleFragment);
+    auto *sobelFragment = (uchar *) malloc(sizeof(uchar) * num_of_rows[worldRank] * imageWidth);
+    auto *sobelFragmentX = (uchar *) malloc(sizeof(uchar) * num_of_rows[worldRank] * imageWidth);
+    auto *sobelFragmentY = (uchar *) malloc(sizeof(uchar) * num_of_rows[worldRank] * imageWidth);
 
-        auto *gradientX = new ImageDataClass(gradientImageX->data, image.numOfRows, image.numOfColumns, 1);
-        auto *gradientY = new ImageDataClass(gradientImageY->data, image.numOfRows, image.numOfColumns, 1);
+    if (worldRank != 0)
+    {
+        MPI_Recv(sobelFragment, pixels_to_receive[worldRank], MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+    }
 
-        auto *sobelMatrixX = new TransformationMatrix<double>(3, multiply_each, sobelXkernel);
-        auto *sobelMatrixY = new TransformationMatrix<double>(3, multiply_each, sobelYkernel);
+    if (worldRank == 0)
+    {
+        for (int i = 1; i < worldSize; i++)
+        {
+            MPI_Send(greyscaleCopy + data_to_send_index[i], pixels_to_receive[i], MPI_UNSIGNED_CHAR, i, 0,
+                     MPI_COMM_WORLD);
+        }
+        memcpy(sobelFragment, greyscaleCopy, static_cast<size_t>(pixels_to_receive[worldRank]));
+    }
 
+    memcpy(sobelFragmentX, sobelFragment, static_cast<size_t>(pixels_to_receive[worldRank]));
+    memcpy(sobelFragmentY, sobelFragment, static_cast<size_t>(pixels_to_receive[worldRank]));
 
-        gradientX->dataStart = convolve(gradientX, 3, sum_pixel_values_absolute, sobelMatrixX, ZERO_FILL);
-        gradientY->dataStart = convolve(gradientY, 3, sum_pixel_values_absolute, sobelMatrixY, ZERO_FILL);
+    auto *gradientX = new ImageDataClass(sobelFragmentX, num_of_rows[worldRank], imageWidth, 1);
+    auto *gradientY = new ImageDataClass(sobelFragmentY, num_of_rows[worldRank], imageWidth, 1);
 
-        cv::Mat sobelImage = Mat(image.numOfRows, image.numOfColumns, CV_8UC1);
+    auto *sobelMatrixX = new TransformationMatrix<double>(3, multiply_each, sobelXkernel);
+    auto *sobelMatrixY = new TransformationMatrix<double>(3, multiply_each, sobelYkernel);
 
-        set_threshold(120);
-        sobelImage.data = multiply_and_sqrt_each_pixel(gradientX, gradientY);
+    gradientX->dataStart = convolve(gradientX, 3, sum_pixel_values_absolute, sobelMatrixX, ZERO_FILL);
+    gradientY->dataStart = convolve(gradientY, 3, sum_pixel_values_absolute, sobelMatrixY, ZERO_FILL);
 
-        delete gradientImageX;
-        delete gradientImageY;
-        delete sobelMatrixX;
-        delete sobelMatrixY;
-        free(greyscaleCopy1);
-        free(greyscaleCopy2);
+    set_threshold(50);
+    sobelFragment = multiply_and_sqrt_each_pixel(gradientX, gradientY);
+
+    if (worldRank != 0)
+    {
+        MPI_Send(sobelFragment + send_back_starting_index[worldRank], pixels_to_send_back[worldRank], MPI_UNSIGNED_CHAR,
+                 0, 0, MPI_COMM_WORLD);
+    }
+
+    if (worldRank == 0)
+    {
+        memcpy(sobelData, sobelFragment, static_cast<size_t>(pixels_to_send_back[worldRank]));
+        for (int i = 1; i < worldSize; ++i)
+        {
+            MPI_Recv(sobelData + data_receive_index[i], pixels_to_send_back[i], MPI_UNSIGNED_CHAR,
+                     i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+
+    if (worldRank == 0)
+    {
+        end = MPI_Wtime();
+        time_passed = end - start;
+        cout << "Time passed: " << time_passed << " seconds" << endl;
+
+        cv::Mat sobelImage = Mat(imageHeight, imageWidth, CV_8UC1, sobelData);
 
 //        namedWindow("sobel");
 //        imshow("sobel", sobelImage);
@@ -167,19 +243,9 @@ int main(int argc, char **argv)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (worldRank == 0)
-    {
-        end = MPI_Wtime();
-        time_passed = end - start;
-
-        cout << "Time passed: " << time_passed << " seconds" << endl;
-    }
-
     MPI_Finalize();
 
     return 0;
-
 }
 
 int getClosestMultiplicant(int number, int multiplier)
@@ -222,72 +288,4 @@ makeGreyscaleCopy(const unsigned char *imageDataBegin, int imageDataSize, int ch
     return greyscaleCopy;
 }
 
-//int main(int argc, char **argv)
-//{
-//    if (argc < 2)
-//    {
-//        cerr << "Invalid arguments number" << endl;
-//        return -1;
-//    }
-//
-//    Mat originalImage = imread(argv[1]);
-//
-//    int imageHeight = originalImage.rows;
-//    int imageWidth = originalImage.cols;
-//
-//    Mat medianedImage(imageHeight, imageWidth, CV_8UC3);
-//    Mat averagedImage(imageHeight, imageWidth, CV_8UC3);
-//
-//    if (originalImage.empty() || originalImage.depth() != CV_8U)
-//    {
-//        cerr << "Image " << argv[0] << " is empty or type invalid" << endl;
-//        return -1;
-//    }
-//
-//    Mat bgr[3];
-//    split(originalImage, bgr);
-//
-////OpenCV uses BGR color order!!!
-//    ImageDataClass B(bgr[0].data, imageHeight, imageWidth, 1);
-//    ImageDataClass G(bgr[1].data, imageHeight, imageWidth, 1);
-//    ImageDataClass R(bgr[2].data, imageHeight, imageWidth, 1);
-//
-//    bgr[0].data = convolve(B, 5, median_filter, nullptr, NN_CLONE);
-//    bgr[1].data = convolve(G, 5, median_filter, nullptr, NN_CLONE);
-//    bgr[2].data = convolve(R, 5, median_filter, nullptr, NN_CLONE);
-//
-//    merge(bgr, 3, medianedImage);
-//
-//    Mat average_bgr[3];
-//    split(originalImage, average_bgr);
-//
-////OpenCV uses BGR color order!!!
-//    ImageDataClass aB(average_bgr[0].data, imageHeight, imageWidth, 1);
-//    ImageDataClass aG(average_bgr[1].data, imageHeight, imageWidth, 1);
-//    ImageDataClass aR(average_bgr[2].data, imageHeight, imageWidth, 1);
-//
-//    int kernelSize = 5;
-//    auto *hat_kernel_matrix = new TransformationMatrix(kernelSize, multiply_each, hat_kernel);
-//
-//    average_bgr[0].data = convolve(aB, kernelSize, sum_pixel_values, hat_kernel_matrix, NN_CLONE);
-//    average_bgr[1].data = convolve(aG, kernelSize, sum_pixel_values, hat_kernel_matrix, NN_CLONE);
-//    average_bgr[2].data = convolve(aR, kernelSize, sum_pixel_values, hat_kernel_matrix, NN_CLONE);
-//
-//    delete hat_kernel_matrix;
-//
-//    merge(average_bgr, 3, averagedImage);
-//
-//    imwrite("leoMedian.jpg", medianedImage);
-//    imwrite("leoAvg.jpg", averagedImage);
-//
-//    namedWindow("original");
-//    namedWindow("medianFilter");
-//    namedWindow("averageHat");
-//    imshow("original", originalImage);
-//    imshow("medianFilter", medianedImage);
-//    imshow("averageHat", averagedImage);
-//    waitKey(0);
-//    destroyAllWindows();
-//}
-
-
+#pragma clang diagnostic pop
