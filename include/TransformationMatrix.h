@@ -32,15 +32,6 @@ public:
 private:
     void (*function)(T *, double *, int);
 };
-
-double *linspace(double start, double end, int numOfPoints);
-
-double *hat_function(double *spacing, int size);
-
-double *transpose_and_multiply(double *vector, int size);
-
-double *hat_kernel(int size);
-
 double *sobelXkernel(int size);
 
 double *sobelYkernel(int size);
@@ -48,6 +39,4 @@ double *sobelYkernel(int size);
 void multiply_each(unsigned char *pixel_area, double *coefficients, int dimSize);
 
 void multiply_each(double *pixel_area, double *coefficients, int dimSize);
-
-double sum_coefficients(double *vector, int size);
 

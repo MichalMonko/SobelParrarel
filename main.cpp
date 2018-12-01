@@ -40,12 +40,6 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
     MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
 
-    if (worldRank == 0)
-    {
-        start = MPI_Wtime();
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-
     dataSize = (int *) malloc(sizeof(int) * worldSize);
     rcv_dataSize = (int *) malloc(sizeof(int) * worldSize);
     dataOffset = (int *) malloc(sizeof(int) * worldSize);
@@ -57,10 +51,15 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     if (worldRank == 0)
     {
         originalImage = imread(argv[1]);
 
+        if (worldRank == 0)
+        {
+            start = MPI_Wtime();
+        }
 
         if (originalImage.empty() || originalImage.depth() != CV_8U)
         {
@@ -231,17 +230,21 @@ int main(int argc, char **argv)
 
         cv::Mat sobelImage = Mat(imageHeight, imageWidth, CV_8UC1, sobelData);
 
-//        namedWindow("sobel");
-//        imshow("sobel", sobelImage);
-//        waitKey(0);
-//        destroyAllWindows();
-
         if (!imwrite(argv[2], sobelImage))
         {
             cerr << "Cannot save converted image, please check filename and extension.\n";
         }
 
     }
+
+    delete gradientX;
+    delete gradientY;
+    delete sobelMatrixX;
+    delete sobelMatrixY;
+    free(sobelFragmentX);
+    free(sobelFragmentY);
+    free(sobelFragment);
+    free(sobelData);
 
     MPI_Finalize();
 

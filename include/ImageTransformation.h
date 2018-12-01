@@ -12,19 +12,9 @@
 
 u_char *multiply_and_sqrt_each_pixel(ImageDataClass *img1, ImageDataClass *img2);
 
-u_char median_filter(unsigned char pixel_area[], int dimSize);
-
-u_char sum_pixel_values(unsigned char pixel_area[], int dimSize);
-
-u_char sum_pixel_values(double pixel_area[], int dimSize);
-
 u_char sum_pixel_values_absolute(double pixel_area[], int dimSize);
 
-u_char sum_pixel_values_with_threshold(double pixel_area[], int dimSize);
-
 void set_threshold(u_char threshold);
-
-u_char insertion_sort(unsigned char pixel_area[], int dimSize);
 
 template<typename T>
 unsigned char *convolve(ImageDataClass *imageData, int dimSize, unsigned char (*transformation)(T *, int),
