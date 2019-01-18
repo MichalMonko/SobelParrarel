@@ -1,10 +1,8 @@
-//
-// Created by warchlak on 16.11.18.
-//
 #include <cstdlib>
 #include <iostream>
 #include "BorderType.h"
 
+//Klasa przechcowująca obraz w postaci wskaźnika do jego początku oraz definiująca potrzebne operacje
 class ImageDataClass
 {
 public:
@@ -20,8 +18,5 @@ public:
     unsigned char *dataStart;
 
 private:
-
     unsigned char *getPixelAt(int row, int column);
-
-
 };

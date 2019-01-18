@@ -1,8 +1,5 @@
-//
-// Created by warchlak on 07.10.18.
-//
 
-
+//Klasa reprezentująca jądro przekształcenia splotowego
 template<typename T>
 class TransformationMatrix
 {
@@ -10,6 +7,9 @@ public:
     const int dimSize;
     double *coefficients;
 
+    //dimSize określa rozmiar okna, func określa operację dokonywaną na pikselach obrazu
+    //i współczynnikach jądra (dla zwykłego splotu jest to ich wymnożenie)
+    //kernel_initializer zwraca tablicę współczynników jądra
     TransformationMatrix(int dimSize, void (*func)(T *, double *, int),
                          double *(*kernel_initializer)(int))
             : dimSize(dimSize)

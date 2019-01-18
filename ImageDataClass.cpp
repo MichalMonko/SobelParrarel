@@ -1,6 +1,3 @@
-//
-// Created by warchlak on 07.10.18.
-//
 #include "include/ImageDataClass.h"
 
 ImageDataClass::ImageDataClass(unsigned char *data, int rows, int columns, int channels)
@@ -14,6 +11,8 @@ u_char *ImageDataClass::getPixelAt(int row, int column)
     return (dataStart + column + row * numOfColumns * numOfChannels);
 }
 
+//Zwraca wartość wybranego piksela, jeżeli dany piksel nie istnieje to zwraca wartość zależną od parametru border_type
+// (0 albo klonuje najbliższy piksel)
 u_char ImageDataClass::getPixelValueRelativeTo(int row, int col, int rowOffset, int colOffset, BORDER_TYPE border_type)
 {
     int rowIndex = row + rowOffset;

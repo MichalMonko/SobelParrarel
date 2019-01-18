@@ -1,17 +1,15 @@
-//
-// Created by warchlak on 16.11.18.
-//
-
 #include <cmath>
 #include "include/ImageTransformation.h"
 
-u_char THRESHOLD = 100;
+u_char THRESH = 50;
 
+//Podnoszenie do kwaratu, sumowanie, pierwiastkowanie oraz progowanie dla dwóch obrazów
 u_char *multiply_and_sqrt_each_pixel(ImageDataClass *img1, ImageDataClass *img2)
 {
     int numOfRows = img1->numOfRows;
     int numOfColumns = img1->numOfColumns;
 
+    //sprawdzenie czy rozmiary obu obrazów są sobie równe
     if (numOfRows != img2->numOfRows || numOfColumns != img2->numOfColumns)
     {
         return nullptr;
@@ -26,6 +24,8 @@ u_char *multiply_and_sqrt_each_pixel(ImageDataClass *img1, ImageDataClass *img2)
     u_char pixelValue2;
     u_char pixelValueResult;
 
+    //dokonywanie operacji matematycznej sqrt(x^2 + y^2) a następnie progowanie w celu utworzenia
+    //obrazu wynikowego
     for (int row = 0; row < numOfRows; row++)
     {
         for (int col = 0; col < numOfColumns; col++)
@@ -33,7 +33,7 @@ u_char *multiply_and_sqrt_each_pixel(ImageDataClass *img1, ImageDataClass *img2)
             pixelValue1 = image_matrix_1[numOfColumns * row + col];
             pixelValue2 = image_matrix_2[numOfColumns * row + col];
             pixelValueResult = (u_char) sqrt(pixelValue1 * pixelValue1 + pixelValue2 * pixelValue2);
-            pixelValueResult = (pixelValueResult > THRESHOLD) ? (u_char) 255 : (u_char) 0;
+            pixelValueResult = (pixelValueResult > THRESH) ? (u_char) 255 : (u_char) 0;
             new_image[numOfColumns * row + col] = pixelValueResult;
         }
     }
@@ -41,6 +41,7 @@ u_char *multiply_and_sqrt_each_pixel(ImageDataClass *img1, ImageDataClass *img2)
     return new_image;
 }
 
+//wartość bezwględna sumy wszystkich pikseli w oknie
 u_char sum_pixel_values_absolute(double *pixel_area, int dimSize)
 {
     double sum = 0;
@@ -53,7 +54,7 @@ u_char sum_pixel_values_absolute(double *pixel_area, int dimSize)
 
 void set_threshold(u_char threshold)
 {
-    THRESHOLD = threshold;
+    THRESH = threshold;
 }
 
 
